@@ -1,4 +1,7 @@
 FROM alpine:latest
+
+RUN apk add rsync
+
 ENV SOURCE=/media/volume
 ENV DESTINATION=/media/backup
 ENV BACKUP_FOLDER=
@@ -8,6 +11,4 @@ WORKDIR /
 
 COPY backup.sh backup.sh
 
-ENTRYPOINT ["/bin/ash", "-c"]
-
-CMD ["/backup.sh"]
+ENTRYPOINT ["/backup.sh"]
