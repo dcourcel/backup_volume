@@ -8,17 +8,15 @@ function doArchive() {
     fi
 
     if ! mkdir -p "/media/backup/$BACKUP_FOLDER/$date_dir"; then
-        return_code=$?
         echo "Cannot create directory /media/backup/$BACKUP_FOLDER/$date_dir"
-        $return_code
+        return 1
     fi
 
     echo "Creating archive."
     cd $1
     if ! tar -c -f "/media/backup/$BACKUP_FOLDER/$date_dir/$ARCHIVE_NAME.tar${COMPRESS_EXT}" $COMPRESS_PARAM . ; then
-        return_code=$?
         echo "$ARCHIVE_NAME backup failed while doing rsync."
-        return $return_code
+        return 1
     fi
     echo "$ARCHIVE_NAME archive created."
 }
@@ -26,9 +24,8 @@ function doArchive() {
 function doRsync() {
     echo "Doing rsync."
     if ! rsync --archive --delete "$SOURCE/" "$backup_rsync"; then
-        return_code=$?
         echo "$ARCHIVE_NAME backup failed while doing rsync."
-        return $return_code
+        return 1
     fi
     echo "rsync completed."
 }
