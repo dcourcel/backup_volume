@@ -2,19 +2,37 @@
 set -e -o pipefail
 
 function doArchive() {
-    if [ -z "$1" -a -d "$1" ]; then
-        echo "Need to have an existing source folder as first parameter in doArchive function."
+    if [ "$1" == "--rsync" ]; then
+      source_folder="$2"
+    else
+      source_folder="$1"
+    fi
+
+    if [ -z "$source_folder" -a -d "$source_folder" ]; then
+        echo "Need to have an existing source folder as parameter in doArchive function."
         return 1
     fi
 
-    if ! mkdir -p "/media/backup/$BACKUP_FOLDER/$date_dir"; then
-        echo "Cannot create directory /media/backup/$BACKUP_FOLDER/$date_dir"
+    cd $source_folder
+    if [ "$1" == "--rsync" ]; then
+        if [ ! -f "date" -o ! -d content ]; then
+            echo "No date file or content folder. Failing back to date_dir"
+            date_from_file="$date_dir-prev"
+        else
+            date_from_file=$(cat date)
+            cd content
+        fi
+    else
+        date_from_file="$date_dir"
+    fi
+
+    if ! mkdir -p "/media/backup/$BACKUP_FOLDER/$date_from_file"; then
+        echo "Cannot create directory /media/backup/$BACKUP_FOLDER/$date_from_file"
         return 1
     fi
 
     echo "Creating archive."
-    cd $1
-    if ! tar -c -f "/media/backup/$BACKUP_FOLDER/$date_dir/$ARCHIVE_NAME.tar${COMPRESS_EXT}" $COMPRESS_PARAM . ; then
+    if ! tar -c -f "/media/backup/$BACKUP_FOLDER/$date_from_file/$ARCHIVE_NAME.tar${COMPRESS_EXT}" $COMPRESS_PARAM . ; then
         echo "$ARCHIVE_NAME backup failed while doing rsync."
         return 1
     fi
@@ -23,7 +41,11 @@ function doArchive() {
 
 function doRsync() {
     echo "Doing rsync."
-    if ! rsync --archive --delete "$SOURCE/" "$backup_rsync"; then
+    if ! echo "$date_dir" > "$backup_rsync/date"; then
+        echo "Failed to write date inside $backup_rsync/date"
+        return 1
+    fi
+    if ! rsync --archive --delete "$SOURCE/" "$backup_rsync/content"; then
         echo "$ARCHIVE_NAME backup failed while doing rsync."
         return 1
     fi
@@ -87,21 +109,21 @@ echo "Begin $ARCHIVE_NAME backup."
 if [ -n "$rsync_folder" ]; then
     backup_rsync="/media/backup/$BACKUP_FOLDER/$rsync_folder"
     if [ -d $backup_rsync ] && [ -n "$(ls $backup_rsync)" ]; then
-        if doArchive "$backup_rsync" && doRsync; then
+        if doArchive "--rsync" "$backup_rsync" && doRsync; then
             echo "$ARCHIVE_NAME backup completed."
         else
             echo "$ARCHIVE_NAME backup failed."
         fi
     else
         echo "rsync folder does not exist or is empty. Only do rsync this time."
-        if mkdir -p "$backup_rsync"; then
+        if mkdir -p "$backup_rsync/content"; then
             if doRsync; then
                 echo "$ARCHIVE_NAME backup completed."
             else
                 echo "$ARCHIVE_NAME backup failed."
             fi
         else
-          echo "Cannot create directory $backup_rsync"
+            echo "Cannot create directory $backup_rsync/content"
         fi
     fi
 elif doArchive "$SOURCE"; then
